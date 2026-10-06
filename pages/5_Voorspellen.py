@@ -3,7 +3,7 @@ import streamlit as st
 from schoon import KOLOMMEN, laad_klaar, maak_train_test
 
 st.title("Voorspellen")
-st.write("Hier komt ons model dat de vertraging voorspelt.")
+st.write("Deelvraag 3: welke kenmerken (weer, drukte, baan, vliegtuigtype) voorspellen de vertraging, en hoe goed werkt ons model?")
 
 # data splitsen in train en test
 st.header("Stap 1: data splitsen")

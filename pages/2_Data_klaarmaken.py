@@ -215,7 +215,7 @@ st.write(
 )
 st.write(
     "Conclusie: uur en jaar laten duidelijk verschil zien, dus die nemen we zeker mee. "
-    "Weekdag, maand, maatschappij en drukte hebben we nog niet bekeken. Dat kan bij Analyse, bijvoorbeeld met een lijngrafiek."
+    "Weekdag, maand, maatschappij en drukte hebben we nog niet bekeken. Dat kan bij Vertraging over de tijd, bijvoorbeeld met een lijngrafiek."
 )
 
 # stap 5
@@ -295,10 +295,10 @@ st.write(
 )
 
 st.header("Klaar")
-st.write(f"We hebben nu {getal(len(df))} vluchten en {df.shape[1]} kolommen. Hiermee gaan we verder bij Voorspellen.")
+st.write(f"We hebben nu {getal(len(df))} vluchten en {df.shape[1]} kolommen. Hiermee gaan we verder bij de deelvragen.")
 st.caption(
     "(Uitleg voor de groep: alle stappen achter elkaar staan in de functie laad_klaar in schoon.py. "
     "De andere pagina's gebruiken die functie, zodat we de stappen maar op een plek hoeven aan te passen.)"
 )
-st.write("Conclusie: de data is klaar. We kunnen nu grafieken maken bij Analyse en een model bouwen bij Voorspellen.")
+st.write("Conclusie: de data is klaar. We kunnen nu de lijngrafiek en de kaart maken (Vertraging over de tijd en Bestemmingen) en een model bouwen (Voorspellen).")
 st.dataframe(df.head())

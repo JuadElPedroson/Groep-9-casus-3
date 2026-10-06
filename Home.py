@@ -11,13 +11,12 @@ st.subheader("Hoofdvraag")
 st.write("Wat bepaalt de vertraging van vluchten op Zurich Airport, en kunnen we die voorspellen?")
 
 st.subheader("Deelvragen")
-st.write("1. Hoe verandert de vertraging over de tijd (maand, uur van de dag, 2019 tegenover 2020)?")
-st.write("2. Verschilt de vertraging per bestemming?")
-st.write("3. Heeft het weer in Zurich invloed op de vertraging?")
-st.write("4. Spelen drukte, baan of vliegtuigtype een rol?")
-st.write("5. Hoe goed kunnen we de vertraging voorspellen, en waar zit ons model ernaast?")
+st.write("1. Hoe verandert de vertraging over de tijd (maand, uur van de dag, 2019 tegenover 2020)? Hierbij hoort een lijngrafiek.")
+st.write("2. Verschilt de vertraging per bestemming? Hierbij hoort een kaart.")
+st.write("3. Welke kenmerken (weer, drukte, baan, vliegtuigtype) voorspellen de vertraging, en hoe goed werkt ons model?")
 
 st.subheader("Conclusie")
 st.write("Hier komt een korte samenvatting van ons antwoord.")
+st.write("Ideeen: de belangrijkste bevindingen, het antwoord op de hoofdvraag, wat de data niet kan laten zien.")
 
 st.write("Gebruik het menu links om door het dashboard te gaan.")

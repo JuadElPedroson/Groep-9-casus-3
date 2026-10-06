@@ -10,7 +10,7 @@ schedule = laad_schedule()
 st.subheader("Schedule Airport")
 st.write(f"{schedule.shape[0]} rijen en {schedule.shape[1]} kolommen")
 st.dataframe(schedule.head())
-st.write("Je ziet per vlucht de datum, geplande en echte tijd, baan, vliegtuigtype en bestemming. Handig voor vraag 1, 2 en 4: hieruit rekenen we de vertraging uit.")
+st.write("Je ziet per vlucht de datum, geplande en echte tijd, baan, vliegtuigtype en bestemming. Handig voor alle vragen: hieruit rekenen we de vertraging uit.")
 
 airports = laad_airports()
 st.subheader("Luchthavens")
