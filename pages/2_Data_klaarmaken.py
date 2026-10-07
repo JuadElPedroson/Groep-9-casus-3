@@ -160,6 +160,26 @@ with col2:
 
 n_weg = int((df["vertraging"] < -60).sum())
 max_laat = df["vertraging"].max() / 60
+totaal = len(df)
+n_laat = int((df["vertraging"] > 180).sum())
+
+# drie manieren om met uitschieters om te gaan, om te vergelijken
+opties = {
+    "alles houden": df,
+    "te vroege vluchten weg (onze keuze)": df[df["vertraging"] >= -60],
+    "ook vluchten van meer dan 3 uur te laat weg": df[(df["vertraging"] >= -60) & (df["vertraging"] <= 180)],
+}
+vergelijk = pd.DataFrame(
+    {
+        naam: {
+            "vluchten": len(d),
+            "gemiddelde vertraging": round(d["vertraging"].mean(), 1),
+            "mediaan": round(d["vertraging"].median(), 1),
+            "% meer dan 15 min te laat": round((d["vertraging"] > 15).mean() * 100, 1),
+        }
+        for naam, d in opties.items()
+    }
+).T
 df = haal_uitschieters_weg(df)
 st.write(
     f"{n_weg} vluchten zijn meer dan 60 minuten te vroeg. Dat komt bijna niet voor en lijkt een fout in de data. "
@@ -173,7 +193,23 @@ st.write(
     f"De te late vluchten laten we staan, ook de langste van {round(max_laat, 1)} uur. "
     "Die zijn echt gebeurd en wij willen juist vertraging voorspellen."
 )
-st.write(f"Er blijven {getal(len(df))} vluchten over.")
+st.write(
+    f"Er blijven {getal(len(df))} vluchten over. We hebben dus {n_weg} vluchten weggehaald, "
+    f"dat is {round(n_weg / totaal * 100, 3)}% van alle vluchten."
+)
+st.write("Maakt onze keuze uit? We hebben drie manieren naast elkaar gelegd:")
+st.dataframe(vergelijk)
+st.caption(
+    "(Uitleg voor de groep: dit heet een robuustheidscheck. We veranderen de keuze en kijken of de uitkomst anders wordt. "
+    "Als de getallen bijna gelijk blijven, hangt onze conclusie niet af van wat we weghalen.)"
+)
+st.write(
+    f"Het gemiddelde is {vergelijk.iloc[0]['gemiddelde vertraging']} minuten als we alles houden en "
+    f"{vergelijk.iloc[1]['gemiddelde vertraging']} minuten na onze keuze. Het percentage vluchten dat meer dan 15 minuten te laat is, "
+    f"is {vergelijk.iloc[0]['% meer dan 15 min te laat']}% tegen {vergelijk.iloc[1]['% meer dan 15 min te laat']}%. "
+    f"Dat is bijna hetzelfde. Ook de {getal(n_laat)} vluchten van meer dan 3 uur te laat veranderen weinig, "
+    "maar die laten we toch staan omdat ze echt lijken."
+)
 st.write(
     "Conclusie: een paar foute vluchten kunnen het model nu niet meer scheef trekken. "
     "De zeer late vluchten blijven, dus het model moet daar ook mee kunnen omgaan. Dat letten we op bij het beoordelen van het model."

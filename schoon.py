@@ -49,14 +49,16 @@ def maak_kolommen(df):
 # luchthaven erbij zoeken op ICAO-code, als dat niet lukt op IATA-code
 def koppel_luchthavens(df, airports):
     df = df.copy()
-    nieuw = {"Name": "luchthaven", "Country": "land", "Latitude": "lat", "Longitude": "lon"}
+    nieuw = {"Name": "luchthaven", "Country": "land", "Latitude": "lat", "Longitude": "lon", "Tz": "tijdzone"}
     op_icao = airports.drop_duplicates("ICAO").set_index("ICAO")[list(nieuw)].rename(columns=nieuw)
     op_iata = airports.drop_duplicates("IATA").set_index("IATA")[list(nieuw)].rename(columns=nieuw)
     df = df.join(op_icao, on="Org/Des")
     gemist = df["luchthaven"].isna() & df["Org/Des"].notna()
     for kolom in op_iata.columns:
         df.loc[gemist, kolom] = df.loc[gemist, "Org/Des"].map(op_iata[kolom])
-    return df
+    # werelddeel is het eerste stuk van de tijdzone, bijvoorbeeld Europe uit Europe/Zurich
+    df["regio"] = df["tijdzone"].str.split("/").str[0].replace("\\N", np.nan)
+    return df.drop(columns="tijdzone")
 
 
 # weer van 2019 en 2020 koppelen op datum, snow en tsun zijn leeg dus die laten we weg
@@ -82,3 +84,33 @@ def laad_klaar():
 # 80 procent om van te leren (train) en 20 procent om te testen
 def maak_train_test(df):
     return train_test_split(df[KOLOMMEN], df["vertraging"], test_size=0.2, random_state=42)
+
+
+ZURICH_LAT = 47.4647
+ZURICH_LON = 8.5492
+
+
+# afstand in km tot Zurich Airport met de haversine-formule
+def afstand_tot_zurich(lat, lon):
+    p = np.pi / 180
+    a = (
+        np.sin((lat - ZURICH_LAT) * p / 2) ** 2
+        + np.cos(lat * p) * np.cos(ZURICH_LAT * p) * np.sin((lon - ZURICH_LON) * p / 2) ** 2
+    )
+    return 6371 * 2 * np.arcsin(np.sqrt(a))
+
+
+# per luchthaven het aantal vluchten, de gemiddelde vertraging en de afstand tot Zurich
+def per_luchthaven(df):
+    tabel = df.groupby("Org/Des").agg(
+        luchthaven=("luchthaven", "first"),
+        land=("land", "first"),
+        lat=("lat", "first"),
+        lon=("lon", "first"),
+        regio=("regio", "first"),
+        vluchten=("vertraging", "size"),
+        gemiddelde=("vertraging", "mean"),
+    ).reset_index()
+    tabel = tabel.dropna(subset=["lat", "lon"])
+    tabel["afstand"] = afstand_tot_zurich(tabel["lat"], tabel["lon"])
+    return tabel.round({"gemiddelde": 1, "afstand": 0})
