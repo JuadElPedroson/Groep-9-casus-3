@@ -2,6 +2,8 @@ import streamlit as st
 
 from data import laad_airports, laad_schedule, laad_vlucht, laad_weer, vlucht_bestanden
 
+st.set_page_config(page_title="Data inspectie", layout="wide")
+
 st.title("Data inspectie")
 st.write("De eerste regels van elke dataset, zodat we zien wat erin zit.")
 st.write("Let op: deze pagina halen we later weg.")

@@ -2,6 +2,8 @@ import streamlit as st
 
 from schoon import KOLOMMEN, laad_klaar, maak_train_test
 
+st.set_page_config(page_title="Voorspellen", layout="wide")
+
 st.title("Voorspellen")
 st.write("Deelvraag 3: welke kenmerken (weer, drukte, baan, vliegtuigtype) voorspellen de vertraging, en hoe goed werkt ons model?")
 
@@ -16,11 +18,6 @@ st.write(
 )
 st.write(f"Train: {len(X_train)} vluchten. Test: {len(X_test)} vluchten.")
 st.write("We gebruiken deze kolommen om te voorspellen: " + ", ".join(KOLOMMEN) + ".")
-st.caption(
-    "(Uitleg voor de groep: X_train en X_test zijn de kolommen waarmee we voorspellen, y_train en y_test is de vertraging. "
-    "De splitsing is willekeurig, maar met random_state=42 krijgt iedereen dezelfde splitsing. "
-    "De code staat in maak_train_test in schoon.py, daar staat ook de lijst KOLOMMEN.)"
-)
 st.write(
     "Conclusie: we hebben nu een train en een test. We trainen alleen op de train en gebruiken de test pas aan het eind, "
     "om eerlijk te zien hoe goed het model is."

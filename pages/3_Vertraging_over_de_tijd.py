@@ -1,5 +1,7 @@
 import streamlit as st
 
+st.set_page_config(page_title="Vertraging over de tijd", layout="wide")
+
 st.title("Vertraging over de tijd")
 st.write("Deelvraag 1: hoe verandert de vertraging over de tijd (maand, uur van de dag, 2019 tegenover 2020)?")
 

@@ -1,5 +1,7 @@
 import streamlit as st
 
+st.set_page_config(page_title="Databronnen", layout="wide")
+
 st.title("Databronnen")
 
 st.write("""

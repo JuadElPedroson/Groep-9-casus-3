@@ -13,24 +13,16 @@ def getal(n):
     return f"{n:,}".replace(",", ".")
 
 
+st.set_page_config(page_title="Data klaarmaken", layout="wide")
+
 st.title("Data klaarmaken")
 st.write("Hier laten we stap voor stap zien hoe we de data klaar hebben gemaakt om de vertraging te voorspellen.")
-st.caption(
-    "(Uitleg voor de groep: de grijze regels met haakjes zijn extra uitleg voor ons. Die halen we weg voor de presentatie. "
-    "Waar de code staat: data inlezen in data.py, de opschoonstappen in schoon.py, de tekst en grafieken op deze pagina "
-    "in pages/2_Data_klaarmaken.py.)"
-)
 
 # wat voorspellen we
 st.header("Wat willen we voorspellen?")
 st.write(
     "Vertraging zit niet als kolom in de data. Die rekenen we zelf uit: de echte tijd (ATA_ATD_ltc) "
     "min de geplande tijd (STA_STD_ltc). Dit is onze y. Een negatief getal betekent dat de vlucht te vroeg was."
-)
-st.caption(
-    "(Uitleg voor de groep: y is wat je wilt voorspellen, X zijn de kolommen waarmee je voorspelt. "
-    "STA_STD_ltc is de geplande tijd en ATA_ATD_ltc de echte tijd, ltc is waarschijnlijk lokale tijd. "
-    "Het verschil rekenen we uit in de functie maak_vertraging in schoon.py.)"
 )
 
 st.subheader("Welke kolommen denken we nodig te hebben?")
@@ -48,11 +40,6 @@ kolommen_tabel = pd.DataFrame(
     columns=["Kolom", "Wat is het", "Waarom denken we dat het helpt"],
 )
 st.table(kolommen_tabel)
-st.caption(
-    "(Uitleg voor de groep: kolommen die niet in deze tabel staan gebruiken we niet om te voorspellen. "
-    "De lijst die het model straks echt gebruikt staat bovenaan schoon.py bij KOLOMMEN. "
-    "Sommige daarvan, zoals uur en drukte, bestaan nog niet en maken we in stap 4.)"
-)
 st.write(
     "Deze gebruiken we niet: ATA_ATD_ltc (dat is de uitkomst zelf), Identifier (alleen datum, tijd en vlucht aan elkaar) "
     "en DL1 tot IX2 (we weten nog niet wat ze betekenen)."
@@ -74,10 +61,6 @@ st.write(
     "De tijden in de data hebben geen datum. Een vlucht die om 23:50 gepland is en om 00:10 vertrekt, "
     "lijkt dan bijna 24 uur te vroeg."
 )
-st.caption(
-    "(Uitleg voor de groep: de tijden zijn alleen een tijdstip, zonder datum. Daarom rekenen we in minuten en tellen we "
-    "bij een negatief verschil van meer dan 3 uur een dag op. Dit staat in maak_vertraging in schoon.py.)"
-)
 st.write(
     f"Bij de eerste berekening kwam de laagste waarde uit op {round(laagste_ruw)} minuten. "
     f"Dat zijn {n_middernacht} vluchten die meer dan 3 uur te vroeg lijken. Dat kan niet echt zo zijn. "
@@ -92,11 +75,6 @@ groep = pd.cut(
 kruis = (pd.crosstab(df["LSV"], groep, normalize="index") * 100).round(1)
 st.write("Crosstab: percentage vluchten per groep.")
 st.dataframe(kruis)
-st.caption(
-    "(Uitleg voor de groep: een crosstab telt hoe vaak combinaties voorkomen. Hier staat per L en S hoeveel procent "
-    "van de vluchten in elke groep valt. De groepen maken we met pd.cut, de procenten met normalize='index'. "
-    "Deze code staat in pages/2_Data_klaarmaken.py.)"
-)
 st.write(
     f"Wat opvalt: bij S is {kruis.loc['S', 'meer dan 15 min te laat']}% van de vluchten meer dan 15 minuten te laat, "
     f"bij L is dat {kruis.loc['L', 'meer dan 15 min te laat']}%. Daarom nemen we LSV mee als kolom."
@@ -116,18 +94,10 @@ st.write(
     "In veel kolommen staat een streepje. Dat betekent dat de waarde onbekend is. "
     "Wij hebben alle streepjes veranderd in een lege waarde, zodat we ze kunnen tellen."
 )
-st.caption(
-    "(Uitleg voor de groep: leeg (NaN) betekent dat er niets staat. Een streepje is voor pandas gewoon tekst en wordt "
-    "niet als leeg geteld, daarom zetten we het eerst om. Dit staat in streepjes_naar_leeg in schoon.py.)"
-)
 st.dataframe(leeg_tabel)
 st.write(
     "TAR, GAT, RWC en Org/Des hebben maar een paar lege waarden. Die vluchten houden we, we laten alleen die waarde leeg. "
     "DL1 tot IX2 zijn grotendeels leeg en we weten niet wat ze betekenen. Die laten we weg."
-)
-st.caption(
-    "(Uitleg voor de groep: DL1 tot IX2 staan nog wel in de data, maar niet in KOLOMMEN in schoon.py. "
-    "Het model ziet ze dus niet. TAR en GAT staan ook niet in KOLOMMEN, die kunnen we er later nog bij zetten.)"
 )
 st.write(
     "Conclusie: RWC en Org/Des nemen we mee, met de lege waarden als onbekend. DL1 tot IX2 gebruiken we pas als we "
@@ -144,10 +114,6 @@ st.plotly_chart(fig)
 st.write(
     "In de boxplot zie je dat de meeste vluchten dicht bij 0 zitten, maar dat er veel punten ver weg liggen. "
     "We hebben naar de uiterste waarden gekeken."
-)
-st.caption(
-    "(Uitleg voor de groep: een boxplot laat de verdeling zien. De doos is de middelste 50% van de vluchten, "
-    "de streep in de doos is de mediaan. De punten ver buiten de doos zijn uitschieters. De boxplot maken we met px.box.)"
 )
 kijk = ["datum", "FLT", "LSV", "STA_STD_ltc", "ATA_ATD_ltc", "vertraging"]
 col1, col2 = st.columns(2)
@@ -185,10 +151,6 @@ st.write(
     f"{n_weg} vluchten zijn meer dan 60 minuten te vroeg. Dat komt bijna niet voor en lijkt een fout in de data. "
     "Die halen we weg."
 )
-st.caption(
-    "(Uitleg voor de groep: de grens van 60 minuten staat in haal_uitschieters_weg in schoon.py. "
-    "Willen we een andere grens, dan veranderen we alleen dat getal.)"
-)
 st.write(
     f"De te late vluchten laten we staan, ook de langste van {round(max_laat, 1)} uur. "
     "Die zijn echt gebeurd en wij willen juist vertraging voorspellen."
@@ -199,10 +161,6 @@ st.write(
 )
 st.write("Maakt onze keuze uit? We hebben drie manieren naast elkaar gelegd:")
 st.dataframe(vergelijk)
-st.caption(
-    "(Uitleg voor de groep: dit heet een robuustheidscheck. We veranderen de keuze en kijken of de uitkomst anders wordt. "
-    "Als de getallen bijna gelijk blijven, hangt onze conclusie niet af van wat we weghalen.)"
-)
 st.write(
     f"Het gemiddelde is {vergelijk.iloc[0]['gemiddelde vertraging']} minuten als we alles houden en "
     f"{vergelijk.iloc[1]['gemiddelde vertraging']} minuten na onze keuze. Het percentage vluchten dat meer dan 15 minuten te laat is, "
@@ -221,11 +179,6 @@ df = maak_kolommen(df)
 st.write(
     "Uit de datum en tijd halen we uur, weekdag, maand en jaar. Uit het vluchtnummer halen we de maatschappij "
     "(eerste 2 letters). Drukte is het aantal vluchten in hetzelfde uur op dezelfde dag."
-)
-st.caption(
-    "(Uitleg voor de groep: nieuwe kolommen maken uit bestaande kolommen heet feature engineering. "
-    "Een model kan niets met een tijd als tekst, maar wel met het uur als getal. Weekdag 0 is maandag en 6 is zondag. "
-    "Dit staat in maak_kolommen in schoon.py.)"
 )
 st.dataframe(df[["datum", "STA_STD_ltc", "uur", "weekdag", "maand", "jaar", "FLT", "maatschappij", "drukte"]].head())
 
@@ -264,11 +217,6 @@ st.write(
     "Org/Des is de herkomst bij een landing en de bestemming bij een start. "
     "We zoeken de code op in de Kaggle-data, eerst op ICAO-code en als dat niet lukt op IATA-code."
 )
-st.caption(
-    "(Uitleg voor de groep: ICAO is een code van 4 letters voor een luchthaven (Zurich is LSZH), IATA van 3 letters (Zurich is ZRH). "
-    "Koppelen betekent dat we twee tabellen samenvoegen op een kolom die ze allebei hebben. "
-    "Dit staat in koppel_luchthavens in schoon.py, de luchthavens zelf komen uit laad_airports in data.py.)"
-)
 st.write(
     f"Van {n_codes} codes hebben we er {n_gevonden} gevonden. "
     f"Dat laat {getal(n_zonder)} vluchten zonder luchthaven, die laten we leeg. "
@@ -291,11 +239,6 @@ st.write(
     f"Het weerbestand begint in 1973 en heeft {getal(len(weer))} dagen. Wij hebben alleen de dagen van 2019 en 2020 nodig "
     f"({len(weer_jaren)} dagen) en koppelen die op datum aan de vluchten."
 )
-st.caption(
-    "(Uitleg voor de groep: tavg is de gemiddelde temperatuur, prcp neerslag, wdir windrichting, wspd windsnelheid, "
-    "wpgt windstoten, pres luchtdruk, snow sneeuw en tsun zonuren. Elke vlucht krijgt het weer van zijn dag. "
-    "Dit staat in koppel_weer in schoon.py, het weer zelf komt uit laad_weer in data.py.)"
-)
 st.write("Lege waarden in het weer van 2019 en 2020:")
 st.dataframe(leeg_weer.rename("aantal leeg"))
 st.write(
@@ -309,10 +252,6 @@ verband = verband.drop("vertraging").round(3).reset_index()
 verband.columns = ["kolom", "verband"]
 fig = px.bar(verband, x="kolom", y="verband", labels={"verband": "Verband met vertraging"})
 st.plotly_chart(fig)
-st.caption(
-    "(Uitleg voor de groep: verband (correlatie) is een getal van -1 tot 1. Dichtbij 0 is geen verband. "
-    "Dichtbij 1 betekent dat als het ene hoger is, het andere ook hoger is. Hier is alles klein.)"
-)
 weer_verband = verband[verband["kolom"] != "drukte"]
 sterkste = weer_verband.loc[weer_verband["verband"].abs().idxmax()]
 drukte_verband = verband.loc[verband["kolom"] == "drukte", "verband"].iloc[0]
@@ -332,9 +271,5 @@ st.write(
 
 st.header("Klaar")
 st.write(f"We hebben nu {getal(len(df))} vluchten en {df.shape[1]} kolommen. Hiermee gaan we verder bij de deelvragen.")
-st.caption(
-    "(Uitleg voor de groep: alle stappen achter elkaar staan in de functie laad_klaar in schoon.py. "
-    "De andere pagina's gebruiken die functie, zodat we de stappen maar op een plek hoeven aan te passen.)"
-)
 st.write("Conclusie: de data is klaar. We kunnen nu de lijngrafiek en de kaart maken (Vertraging over de tijd en Bestemmingen) en een model bouwen (Voorspellen).")
 st.dataframe(df.head())
