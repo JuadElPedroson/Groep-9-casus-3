@@ -50,37 +50,35 @@ def train_model(X_train, y_train):
  
  
 st.title("Voorspellen")
-st.write("Deelvraag 3: welke kenmerken (weer, drukte, baan, vliegtuigtype) voorspellen de vertraging, en hoe goed werkt ons model?")
+st.write("Deelvraag 3: welke kenmerken (weer, drukte, baan, vliegtuigtype) voorspellen de vertraging, en hoe goed doet ons model dat?")
  
 # data splitsen in train en test
 st.header("Stap 1: data splitsen")
 df = maak_getallen(laad_klaar())
 X_train, X_test, y_train, y_test = maak_train_test(df)
 st.write(
-    "Eerst splitsen we de data. 80% gebruiken we om het model van te laten leren (train). "
-    "De andere 20% houden we apart (test). Pas aan het eind kijken we hoe goed het model is op de test. "
-    "Zo weten we dat het model ook werkt op vluchten die het nog niet gezien heeft."
+    "We verdelen de vluchten in twee delen. Met 80% leert het model (de trainset). "
+    "De andere 20% krijgt het model niet te zien (de testset). Daarmee controleren we aan het eind "
+    "of het model ook goed voorspelt bij vluchten die het nog nooit gezien heeft."
 )
-st.write(f"Train: {len(X_train)} vluchten. Test: {len(X_test)} vluchten.")
-st.write("We gebruiken deze kolommen om te voorspellen: " + ", ".join(KOLOMMEN) + ".")
-st.write(
-    "Conclusie: we hebben nu een train en een test. We trainen alleen op de train en gebruiken de test pas aan het eind, "
-    "om eerlijk te zien hoe goed het model is."
-)
+links, rechts = st.columns(2)
+links.metric("Trainset", f"{len(X_train):,} vluchten".replace(",", "."))
+rechts.metric("Testset", f"{len(X_test):,} vluchten".replace(",", "."))
+st.write("Het model krijgt deze kenmerken mee: " + ", ".join(NAMEN[k] for k in KOLOMMEN) + ".")
  
 st.header("Stap 2: het model trainen")
 st.write(
-    "We gebruiken een random forest. Dat zijn veel beslisbomen die samen een voorspelling maken. "
-    "Een model kan alleen met getallen rekenen, dus tekst zoals het vliegtuigtype hebben we eerst omgezet naar een nummer. "
-    "Lege waarden hebben we -1 gemaakt."
+    "We gebruiken een random forest: een groep beslisbomen die samen een voorspelling maken. "
+    "Het model rekent alleen met getallen, dus tekst zoals het vliegtuigtype hebben we omgezet naar een nummer. "
+    "Lege waarden hebben we op -1 gezet."
 )
 model = train_model(X_train, y_train)
 voorspelling = model.predict(X_test)
  
 st.header("Stap 3: welke kenmerken voorspellen de vertraging?")
 st.write(
-    "Het random forest houdt bij hoe vaak en hoe goed elke kolom helpt om de vertraging te voorspellen. "
-    "Dat heet het belang van een kolom. Alles bij elkaar is 100%."
+    "Het random forest houdt bij hoeveel elk kenmerk helpt bij het voorspellen. "
+    "Dat noemen we het belang. Samen is dat 100%."
 )
 belang = pd.DataFrame({"kolom": KOLOMMEN, "belang": model.feature_importances_ * 100})
 belang["groep"] = belang["kolom"].map(GROEPEN)
@@ -103,9 +101,9 @@ st.caption(
  
 st.header("Stap 4: hoe goed werkt het model?")
 st.write(
-    "We vergelijken het model met een simpele gok: voorspel voor elke vlucht gewoon de gemiddelde vertraging. "
-    "Het model moet beter zijn dan die gok, anders heeft het niks geleerd. "
-    "We kijken naar de gemiddelde fout: hoeveel minuten zit de voorspelling er gemiddeld naast?"
+    "We vergelijken het model met een simpele gok: voor elke vlucht de gemiddelde vertraging voorspellen. "
+    "Doet het model het niet beter dan die gok, dan heeft het niks geleerd. "
+    "We kijken naar de gemiddelde fout: hoeveel minuten zit de voorspelling ernaast?"
 )
 fout_gok = mean_absolute_error(y_test, [y_train.mean()] * len(y_test))
 fout_model = mean_absolute_error(y_test, voorspelling)
@@ -134,11 +132,18 @@ st.plotly_chart(fig)
  
 st.header("Conclusie")
 st.write(
-    f"Tijd (vooral het uur van de dag en het jaar) en de baan zijn het belangrijkst om de vertraging te voorspellen. "
-    f"Het weer telt samen ook flink mee, vooral de temperatuur. Drukte helpt een beetje, het vliegtuigtype bijna niet. "
-    f"Ons model zit er gemiddeld {fout_model:.1f} minuten naast, de simpele gok {fout_gok:.1f} minuten. "
-    f"Het model is dus beter dan gokken, maar nog niet heel precies: grote vertragingen voorspelt het vaak te laag. "
-    f"Dat komt doordat veel oorzaken van vertraging (bijvoorbeeld problemen op een andere luchthaven) niet in onze data staan."
+    "**Wat voorspelt de vertraging?** Vooral de tijd (het uur van de dag en het jaar) en de baan. "
+    "Het weer telt samen ook flink mee, met temperatuur als belangrijkste. "
+    "Drukte helpt een beetje, het vliegtuigtype bijna niet."
+)
+st.write(
+    f"**Hoe goed is het model?** Het zit er gemiddeld {fout_model:.1f} minuten naast, "
+    f"tegenover {fout_gok:.1f} minuten bij gokken. Het model is dus beter dan gokken, maar niet precies. "
+    "Vooral grote vertragingen schat het te laag in."
+)
+st.write(
+    "**Waarom niet beter?** Veel oorzaken van vertraging staan niet in onze data, "
+    "zoals problemen op een andere luchthaven of een technisch mankement."
 )
  
  
