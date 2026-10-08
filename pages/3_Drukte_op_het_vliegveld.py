@@ -8,17 +8,17 @@ from plotly.subplots import make_subplots
 from data import laad_airports, laad_schedule, laad_vlucht, laad_weer, vlucht_bestanden
 from schoon import laad_klaar
 
+st.set_page_config(page_title="Drukte op het vliegveld", layout="wide")
+
 schedule = laad_schedule()
 airports = laad_airports()
 weer = laad_weer()
 bestanden = vlucht_bestanden()
 df = laad_klaar()
 
-st.set_page_config(
-    page_title="Airport Traffic & Delay Dashboard", layout="wide"
-)
-
-st.title("🛫 Analyse Vliegverkeer & Vertraging")
+st.title("Drukte op het vliegveld")
+st.write("Deelvraag 1: hoe verandert de vertraging over de tijd, en hangt dat samen met hoe druk het is op het vliegveld?")
+st.subheader("Kort antwoord: drukte en vertraging lopen vooral in 2019 samen. In 2020 niet.")
 
 # --- 1. DATA PREPARATIE ---
 if "datum" in df.columns:
@@ -151,7 +151,7 @@ def filter_periode(ts, start_date, eenheid):
 
 
 # --- SECTIE 1 (BOVENAAN): TOTALE TIJDSREEKS (VAST OP WEEKBASIS) ---
-st.subheader("Volledig verloop vliegverkeer & vertraging (stappen van een week)")
+st.subheader("Het hele verloop, per week")
 
 ts_weekly = generate_timeseries(df, "1W")
 fig_full = create_dual_axis_chart(
@@ -164,18 +164,25 @@ fig_full = create_dual_axis_chart(
 )
 st.plotly_chart(fig_full, use_container_width=True, key="fig_full_chart")
 
-st.write("In de grafiek is te zien dat er een kleine dip zit in drukte op het vliegveld in November 2019. " \
-"En een gigantische dip in Maart 2020. Het vermoeden bestaat dat dit te maken heeft gehad met de corona uitbraak." \
-"Interessant om te onderzoeken is of de drukte op het vliegveld te maken heeft met de hoeveelheid vertraging." \
-"Houd hierbij in gedachten dat als er weinig vluchten zijn de gemiddelde waardes van de vertraging minder " \
-"betrouwbaar uitkomen.")
+st.markdown(
+    "**Wat we deden.** Per week hebben we geteld hoeveel vliegtuigen er waren (blauw, de drukte) "
+    "en wat de gemiddelde vertraging was (oranje).\n\n"
+    "**Wat opvalt.** In november 2019 is er een kleine dip in de drukte en in maart 2020 een hele grote. "
+    "Waarschijnlijk komt dat door de coronauitbraak, maar dat hebben wij niet getest.\n\n"
+    "**Waarom.** Zo zien we of de drukte en de vertraging samen op en neer gaan. "
+    "Let op: zijn er weinig vluchten, dan is het gemiddelde van de vertraging minder betrouwbaar."
+)
 
 st.markdown("---")
 
 # --- 4. SECTIE 2: VERGELIJKING VAN PERIODES ---
-st.subheader("Vergelijk twee specifieke periodes")
+st.subheader("Twee periodes vergelijken")
 
-st.write("Als er een wens is voor nader onderzoek, kan met onderstaande tool gefilterd worden.")
+st.write(
+    "Hier zet je zelf twee periodes naast elkaar. Kies een tijdseenheid en de begindatum van beide periodes. "
+    "Standaard staat periode 1 aan het begin van de data en periode 2 aan het einde. "
+    "De assen zijn bij beide grafieken gelijk, zodat je ze eerlijk kunt vergelijken."
+)
 
 tijdseenheid = st.selectbox(
     "Kies gewenste tijdseenheid / aggregatie voor de vergelijking:",
@@ -267,7 +274,9 @@ with col2:
         st.warning("Geen data gevonden voor Periode 2.")
 
 st.subheader("Conclusie deelvraag 1")
-st.write("Het lijkt erop dat de drukte op het vliegveld wel degelijk invloed heeft op de vertraging. Met name in" \
-"2019 is dit goed te zien. De lijnen lopen globaal parallel. In 2020 gedraagd de data zich onverwacht. Wat erop" \
-" duidt dat er een grote gebeurtenis heeft plaatsgevonden. Binnen dit onderzoek is niet gedefinieerd wat dat is "
-"(geweest), of onderzocht wat dit te maken heeft gehad met de vertragingen.")
+st.markdown(
+    "Drukte en vertraging lijken samen te hangen. In 2019 is dat goed te zien, de lijnen lopen ongeveer parallel. "
+    "In 2020 gedraagt de data zich anders, waarschijnlijk door de coronauitbraak. Dat hebben wij niet verder onderzocht.\n\n"
+    "Dit hebben we alleen in de grafiek bekeken, het is dus nog geen bewijs dat drukte de vertraging veroorzaakt. "
+    "In deelvraag 3 kijken we of drukte ook helpt om de vertraging te voorspellen."
+)

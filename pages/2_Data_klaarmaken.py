@@ -8,260 +8,184 @@ from schoon import (
     maak_kolommen, maak_vertraging, streepjes_naar_leeg,
 )
 
+BLAUW = "#1f77b4"
+ORANJE = "#e6550d"
+
+# makkelijke namen voor in de grafiek
+NAMEN = {
+    "tavg": "temperatuur", "prcp": "neerslag", "wdir": "windrichting", "wspd": "windsnelheid",
+    "wpgt": "windstoten", "pres": "luchtdruk", "drukte": "drukte",
+}
+
+
 def getal(n):
     return f"{n:,}".replace(",", ".")
 
 
+# alle stappen na elkaar, in de volgorde van de tabs. De uitkomsten worden onthouden (cache),
+# zodat de pagina snel opent
+@st.cache_data
+def bereken():
+    r = {}
+
+    # 1. vertraging uitrekenen
+    schedule = laad_schedule()
+    r["n_data"] = len(schedule)
+    # vertraging zonder correctie, om te zien hoeveel vluchten over middernacht gaan
+    ruw = (pd.to_timedelta(schedule["ATA_ATD_ltc"]) - pd.to_timedelta(schedule["STA_STD_ltc"])).dt.total_seconds() / 60
+    r["n_middernacht"] = int((ruw < -180).sum())
+    r["laagste_ruw"] = round(ruw.min())
+    df = maak_vertraging(schedule)
+    # percentage vroeg, op tijd en te laat per L en S
+    groep = pd.cut(
+        df["vertraging"], [-1000, 0, 15, 2000],
+        labels=["te vroeg", "0 tot 15 min te laat", "meer dan 15 min te laat"],
+    )
+    kruis = (pd.crosstab(df["LSV"], groep, normalize="index") * 100).round(1)
+    r["laat_s"] = kruis.loc["S", "meer dan 15 min te laat"]
+    r["laat_l"] = kruis.loc["L", "meer dan 15 min te laat"]
+    r["kruis"] = kruis.reset_index().melt(id_vars="LSV", var_name="groep", value_name="procent")
+
+    # 2. streepjes en lege waarden
+    df = streepjes_naar_leeg(df)
+    kolommen = ["TAR", "GAT", "RWC", "Org/Des", "DL1", "IX1", "DL2", "IX2"]
+    leeg = (df[kolommen].isna().mean() * 100).round(1).sort_values().reset_index()
+    leeg.columns = ["kolom", "procent"]
+    r["leeg"] = leeg
+
+    # 3. uitschieters
+    r["box"] = df[["LSV", "vertraging"]]
+    r["totaal"] = len(df)
+    r["n_weg"] = int((df["vertraging"] < -60).sum())
+    r["n_laat"] = int((df["vertraging"] > 180).sum())
+    r["max_laat"] = df["vertraging"].max() / 60
+    r["n_buiten"] = int(((df["vertraging"] < -150) | (df["vertraging"] > 300)).sum())
+    r["gem_voor"] = round(df["vertraging"].mean(), 1)
+    r["pct_voor"] = round((df["vertraging"] > 15).mean() * 100, 1)
+    df = haal_uitschieters_weg(df)
+    r["gem_na"] = round(df["vertraging"].mean(), 1)
+    r["pct_na"] = round((df["vertraging"] > 15).mean() * 100, 1)
+
+    # 4. nieuwe kolommen
+    df = maak_kolommen(df)
+    r["per_uur"] = df.groupby("uur")["vertraging"].agg(["mean", "count"]).reset_index()
+
+    # 5. luchthavens en weer koppelen
+    r["n_codes"] = df["Org/Des"].nunique()
+    df = koppel_luchthavens(df, laad_airports())
+    r["n_gevonden"] = df.loc[df["luchthaven"].notna(), "Org/Des"].nunique()
+    r["n_zonder"] = int((df["luchthaven"].isna() & df["Org/Des"].notna()).sum())
+    weer = laad_weer()
+    weer_jaren = weer[pd.to_datetime(weer["datum"]).dt.year.isin([2019, 2020])]
+    r["weer_leeg"] = list(weer_jaren.columns[weer_jaren.isna().all()])
+    df = koppel_weer(df, weer)
+    # verband (correlatie) van weer en drukte met vertraging
+    verband = df[["vertraging", "tavg", "prcp", "wdir", "wspd", "wpgt", "pres", "drukte"]].corr()["vertraging"]
+    verband = verband.drop("vertraging").round(3).reset_index()
+    verband.columns = ["kolom", "verband"]
+    verband["naam"] = verband["kolom"].map(NAMEN)
+    verband["soort"] = ["drukte" if k == "drukte" else "weer" for k in verband["kolom"]]
+    r["verband"] = verband.sort_values("verband", key=abs)
+
+    r["n_klaar"] = len(df)
+    return r
+
+
 st.set_page_config(page_title="Data klaarmaken", layout="wide")
 
+r = bereken()
+
 st.title("Data klaarmaken")
-st.write("Hier laten we stap voor stap zien hoe we de data klaar hebben gemaakt om de vertraging te voorspellen.")
-
-# wat voorspellen we
-st.header("Wat willen we voorspellen?")
 st.write(
-    "Vertraging zit niet als kolom in de data. Die rekenen we zelf uit: de echte tijd (ATA_ATD_ltc) "
-    "min de geplande tijd (STA_STD_ltc). Dit is onze y. Een negatief getal betekent dat de vlucht te vroeg was."
+    f"Van de ruwe vluchtdata naar een tabel waarmee we de vertraging kunnen voorspellen. "
+    f"We begonnen met {getal(r['n_data'])} vluchten en houden er {getal(r['n_klaar'])} over."
 )
 
-st.subheader("Welke kolommen denken we nodig te hebben?")
-kolommen_tabel = pd.DataFrame(
-    [
-        ["LSV", "Waarschijnlijk landing of start", "Landingen en starts lijken te verschillen"],
-        ["STD, STA_STD_ltc", "Datum en geplande tijd", "Maand, weekdag en uur kunnen uitmaken"],
-        ["ACT", "Vliegtuigtype", "Misschien verschilt het per type"],
-        ["RWY, RWC", "Baan en baanconfiguratie", "Hangt waarschijnlijk samen met wind en tijdstip"],
-        ["Org/Des", "Herkomst of bestemming", "Misschien verschilt het per land"],
-        ["FLT", "Vluchtnummer, eerste 2 letters zijn de maatschappij", "Maatschappijen werken anders"],
-        ["Weer", "Temperatuur, neerslag en wind per dag", "Slecht weer kan voor vertraging zorgen"],
-        ["Drukte", "Aantal vluchten per uur (zelf maken)", "Drukke uren geven misschien meer vertraging"],
-    ],
-    columns=["Kolom", "Wat is het", "Waarom denken we dat het helpt"],
-)
-st.table(kolommen_tabel)
+st.subheader("Wat voorspellen we?")
 st.write(
-    "Deze gebruiken we niet: ATA_ATD_ltc (dat is de uitkomst zelf), Identifier (alleen datum, tijd en vlucht aan elkaar) "
-    "en DL1 tot IX2 (we weten nog niet wat ze betekenen)."
+    "De vertraging in minuten: de echte tijd (ATA_ATD_ltc) min de geplande tijd (STA_STD_ltc). "
+    "Die kolom zit niet in de data, dus we maken hem zelf. Een negatief getal betekent te vroeg. "
+    "We voorspellen met kenmerken van de vlucht (landing of start, vliegtuigtype, maatschappij), "
+    "de tijd (uur, weekdag, maand, jaar, drukte), de plek (baan, land) en het weer."
 )
-st.write(
-    "Conclusie: dit zijn onze kolommen om mee te beginnen. Welke echt helpen weten we pas na de analyse en het model."
+st.caption(
+    "Niet gebruikt: ATA_ATD_ltc (dat is de uitkomst zelf), Identifier en DL1 tot IX2 (we weten niet wat ze betekenen)."
 )
 
-# stap 1
-st.header("Stap 1: vertraging uitrekenen")
-schedule = laad_schedule()
-# vertraging zonder correctie, om te zien hoeveel vluchten over middernacht gaan
-ruw = (pd.to_timedelta(schedule["ATA_ATD_ltc"]) - pd.to_timedelta(schedule["STA_STD_ltc"])).dt.total_seconds() / 60
-n_middernacht = int((ruw < -180).sum())
-laagste_ruw = ruw.min()
-
-df = maak_vertraging(schedule)
-st.write(
-    "De tijden in de data hebben geen datum. Een vlucht die om 23:50 gepland is en om 00:10 vertrekt, "
-    "lijkt dan bijna 24 uur te vroeg."
+# vertraging uitrekenen
+st.subheader("Vertraging uitrekenen")
+fig = px.bar(
+    r["kruis"], x="groep", y="procent", color="LSV", barmode="group", text_auto=".1f",
+    color_discrete_map={"L": BLAUW, "S": ORANJE},
+    labels={"groep": "", "procent": "Percentage vluchten", "LSV": "L of S"},
 )
+fig.update_layout(height=320, margin=dict(t=20, b=20))
+st.plotly_chart(fig)
 st.write(
-    f"Bij de eerste berekening kwam de laagste waarde uit op {round(laagste_ruw)} minuten. "
-    f"Dat zijn {n_middernacht} vluchten die meer dan 3 uur te vroeg lijken. Dat kan niet echt zo zijn. "
-    "Bij die vluchten hebben we een dag (1440 minuten) opgeteld."
+    f"De tijden in de data hebben geen datum, daardoor leken {r['n_middernacht']} vluchten rond middernacht "
+    "meer dan 3 uur te vroeg. Daar hebben we een dag bij opgeteld. "
+    f"Bij S is {r['laat_s']}% van de vluchten meer dan 15 minuten te laat, bij L is dat {r['laat_l']}%. "
+    "Dat verschil is groot, dus LSV gaat mee in het model."
 )
 
-# crosstab van vroeg, op tijd en te laat per landing/start
-groep = pd.cut(
-    df["vertraging"], [-1000, 0, 15, 2000],
-    labels=["te vroeg", "0 tot 15 min te laat", "meer dan 15 min te laat"],
-)
-kruis = (pd.crosstab(df["LSV"], groep, normalize="index") * 100).round(1)
-st.write("Crosstab: percentage vluchten per groep.")
-st.dataframe(kruis)
+# streepjes en lege waarden
+st.subheader("Lege waarden")
+dl = r["leeg"][r["leeg"]["kolom"].isin(["DL1", "IX1", "DL2", "IX2"])]["procent"]
 st.write(
-    f"Wat opvalt: bij S is {kruis.loc['S', 'meer dan 15 min te laat']}% van de vluchten meer dan 15 minuten te laat, "
-    f"bij L is dat {kruis.loc['L', 'meer dan 15 min te laat']}%. Daarom nemen we LSV mee als kolom."
-)
-st.write(
-    "Conclusie: we hebben nu een kolom vertraging, dat is wat we gaan voorspellen. "
-    "Landingen en starts verschillen, dus LSV gaat mee in het model. En we kunnen nu grafieken maken van vertraging."
+    "In veel kolommen staat een streepje voor onbekend. Die hebben we leeg gemaakt. "
+    "TAR, GAT, RWC en Org/Des zijn bijna volledig gevuld (minder dan 1% leeg), die houden we. "
+    f"DL1 tot IX2 zijn voor {dl.min()}% tot {dl.max()}% leeg en we weten niet wat ze betekenen, die laten we weg."
 )
 
-# stap 2
-st.header("Stap 2: streepjes en lege waarden")
-df = streepjes_naar_leeg(df)
-kolommen = ["TAR", "GAT", "RWC", "Org/Des", "DL1", "IX1", "DL2", "IX2"]
-leeg = df[kolommen].isna().sum()
-leeg_tabel = pd.DataFrame({"aantal leeg": leeg, "procent": (leeg / len(df) * 100).round(1)})
-st.write(
-    "In veel kolommen staat een streepje. Dat betekent dat de waarde onbekend is. "
-    "Wij hebben alle streepjes veranderd in een lege waarde, zodat we ze kunnen tellen."
-)
-st.dataframe(leeg_tabel)
-st.write(
-    "TAR, GAT, RWC en Org/Des hebben maar een paar lege waarden. Die vluchten houden we, we laten alleen die waarde leeg. "
-    "DL1 tot IX2 zijn grotendeels leeg en we weten niet wat ze betekenen. Die laten we weg."
-)
-st.write(
-    "Conclusie: RWC en Org/Des nemen we mee, met de lege waarden als onbekend. DL1 tot IX2 gebruiken we pas als we "
-    "weten wat ze betekenen. Voor het model moeten de lege waarden later nog ingevuld of apart behandeld worden."
-)
-
-# stap 3
-st.header("Stap 3: uitschieters")
+# uitschieters
+st.subheader("Uitschieters")
+# boxplot, we zoomen in op -150 tot 300 minuten
 fig = px.box(
-    df[["LSV", "vertraging"]], x="LSV", y="vertraging",
+    r["box"], x="LSV", y="vertraging",
     labels={"LSV": "L of S", "vertraging": "Vertraging (minuten)"},
 )
+fig.add_hline(y=-60, line_dash="dot", line_color="gray", annotation_text="grens: -60 min", annotation_position="bottom right")
+fig.update_yaxes(range=[-150, 300])
+fig.update_layout(height=340, margin=dict(t=20, b=20))
 st.plotly_chart(fig)
 st.write(
-    "In de boxplot zie je dat de meeste vluchten dicht bij 0 zitten, maar dat er veel punten ver weg liggen. "
-    "We hebben naar de uiterste waarden gekeken."
-)
-kijk = ["datum", "FLT", "LSV", "STA_STD_ltc", "ATA_ATD_ltc", "vertraging"]
-col1, col2 = st.columns(2)
-with col1:
-    st.write("Vluchten die het meest te vroeg waren")
-    st.dataframe(df.nsmallest(5, "vertraging")[kijk])
-with col2:
-    st.write("Vluchten die het meest te laat waren")
-    st.dataframe(df.nlargest(5, "vertraging")[kijk])
-
-n_weg = int((df["vertraging"] < -60).sum())
-max_laat = df["vertraging"].max() / 60
-totaal = len(df)
-n_laat = int((df["vertraging"] > 180).sum())
-
-# drie manieren om met uitschieters om te gaan, om te vergelijken
-opties = {
-    "alles houden": df,
-    "te vroege vluchten weg (onze keuze)": df[df["vertraging"] >= -60],
-    "ook vluchten van meer dan 3 uur te laat weg": df[(df["vertraging"] >= -60) & (df["vertraging"] <= 180)],
-}
-vergelijk = pd.DataFrame(
-    {
-        naam: {
-            "vluchten": len(d),
-            "gemiddelde vertraging": round(d["vertraging"].mean(), 1),
-            "mediaan": round(d["vertraging"].median(), 1),
-            "% meer dan 15 min te laat": round((d["vertraging"] > 15).mean() * 100, 1),
-        }
-        for naam, d in opties.items()
-    }
-).T
-df = haal_uitschieters_weg(df)
-st.write(
-    f"{n_weg} vluchten zijn meer dan 60 minuten te vroeg. Dat komt bijna niet voor en lijkt een fout in de data. "
-    "Die halen we weg."
-)
-st.write(
-    f"De te late vluchten laten we staan, ook de langste van {round(max_laat, 1)} uur. "
-    "Die zijn echt gebeurd en wij willen juist vertraging voorspellen."
-)
-st.write(
-    f"Er blijven {getal(len(df))} vluchten over. We hebben dus {n_weg} vluchten weggehaald, "
-    f"dat is {round(n_weg / totaal * 100, 3)}% van alle vluchten."
-)
-st.write("Maakt onze keuze uit? We hebben drie manieren naast elkaar gelegd:")
-st.dataframe(vergelijk)
-st.write(
-    f"Het gemiddelde is {vergelijk.iloc[0]['gemiddelde vertraging']} minuten als we alles houden en "
-    f"{vergelijk.iloc[1]['gemiddelde vertraging']} minuten na onze keuze. Het percentage vluchten dat meer dan 15 minuten te laat is, "
-    f"is {vergelijk.iloc[0]['% meer dan 15 min te laat']}% tegen {vergelijk.iloc[1]['% meer dan 15 min te laat']}%. "
-    f"Dat is bijna hetzelfde. Ook de {getal(n_laat)} vluchten van meer dan 3 uur te laat veranderen weinig, "
-    "maar die laten we toch staan omdat ze echt lijken."
-)
-st.write(
-    "Conclusie: een paar foute vluchten kunnen het model nu niet meer scheef trekken. "
-    "De zeer late vluchten blijven, dus het model moet daar ook mee kunnen omgaan. Dat letten we op bij het beoordelen van het model."
+    f"Bijna alle vluchten zitten dicht bij 0 (de grafiek is ingezoomd, {r['n_buiten']} vluchten liggen buiten beeld). "
+    f"Meer dan 60 minuten te vroeg komt bijna niet voor en lijkt een fout, dus die {r['n_weg']} vluchten "
+    f"({round(r['n_weg'] / r['totaal'] * 100, 3)}%) halen we weg. "
+    f"Te late vluchten laten we staan, ook de langste van {round(r['max_laat'], 1)} uur: dat is echte vertraging. "
+    f"De keuze verandert weinig, het gemiddelde is {r['gem_voor']} tegen {r['gem_na']} minuten."
 )
 
-# stap 4
-st.header("Stap 4: nieuwe kolommen")
-df = maak_kolommen(df)
+# nieuwe kolommen
+st.subheader("Nieuwe kolommen")
+per_uur = r["per_uur"]
+# alleen uren met minstens 500 vluchten
+genoeg = per_uur[per_uur["count"] >= 500]
+hoogste = genoeg.loc[genoeg["mean"].idxmax()]
+laagste = genoeg.loc[genoeg["mean"].idxmin()]
 st.write(
-    "Uit de datum en tijd halen we uur, weekdag, maand en jaar. Uit het vluchtnummer halen we de maatschappij "
-    "(eerste 2 letters). Drukte is het aantal vluchten in hetzelfde uur op dezelfde dag."
+    "Uit datum en tijd maken we uur, weekdag, maand en jaar. Uit het vluchtnummer maken we de maatschappij "
+    "en drukte is het aantal vluchten in hetzelfde uur op dezelfde dag. "
+    f"Het uur maakt uit: rond {int(hoogste['uur'])} uur is de vertraging het hoogst ({round(hoogste['mean'], 1)} minuten) "
+    f"en rond {int(laagste['uur'])} uur het laagst ({round(laagste['mean'], 1)} minuten)."
 )
-st.dataframe(df[["datum", "STA_STD_ltc", "uur", "weekdag", "maand", "jaar", "FLT", "maatschappij", "drukte"]].head())
 
-# gemiddelde vertraging per uur, alleen uren met genoeg vluchten
-per_uur = df.groupby("uur")["vertraging"].agg(["mean", "count"])
-per_uur = per_uur[per_uur["count"] >= 500].reset_index()
-fig = px.line(
-    per_uur, x="uur", y="mean", markers=True,
-    labels={"uur": "Uur van de dag", "mean": "Gemiddelde vertraging (minuten)"},
+# luchthavens en weer koppelen
+st.subheader("Luchthavens en weer koppelen")
+verband = r["verband"]
+fig = px.bar(
+    verband, x="verband", y="naam", color="soort", orientation="h", text_auto=".2f",
+    color_discrete_map={"weer": BLAUW, "drukte": ORANJE},
+    labels={"verband": "Verband met vertraging (-1 tot 1)", "naam": "", "soort": ""},
 )
+fig.update_layout(height=320, margin=dict(t=20, b=20))
 st.plotly_chart(fig)
-hoogste = per_uur.loc[per_uur["mean"].idxmax()]
-laagste = per_uur.loc[per_uur["mean"].idxmin()]
-st.write(
-    f"Wat opvalt: rond {int(hoogste['uur'])} uur is de vertraging het hoogst ({round(hoogste['mean'], 1)} minuten) "
-    f"en rond {int(laagste['uur'])} uur het laagst ({round(laagste['mean'], 1)} minuten). "
-    "Dus het uur is een goede kolom om mee te nemen."
-)
-per_jaar = df.groupby("jaar")["vertraging"].mean().round(1)
-
-# stap 5
-st.header("Stap 5: luchthavens koppelen")
-n_codes = df["Org/Des"].nunique()
-df = koppel_luchthavens(df, laad_airports())
-n_gevonden = df.loc[df["luchthaven"].notna(), "Org/Des"].nunique()
-n_zonder = int((df["luchthaven"].isna() & df["Org/Des"].notna()).sum())
-st.write(
-    "Org/Des is de herkomst bij een landing en de bestemming bij een start. "
-    "We zoeken de code op in de Kaggle-data, eerst op ICAO-code en als dat niet lukt op IATA-code."
-)
-st.write(
-    f"Van {n_codes} codes hebben we er {n_gevonden} gevonden. "
-    f"Dat laat {getal(n_zonder)} vluchten zonder luchthaven, die laten we leeg. "
-    "Zo hebben we per vlucht het land en de plek op de kaart."
-)
-st.dataframe(df[["Org/Des", "luchthaven", "land", "lat", "lon"]].dropna().drop_duplicates("Org/Des").head())
-
-# stap 6
-st.header("Stap 6: weer koppelen")
-weer = laad_weer()
-weer_jaren = weer[pd.to_datetime(weer["datum"]).dt.year.isin([2019, 2020])]
-leeg_weer = weer_jaren.isna().sum()
-leeg_weer = leeg_weer[leeg_weer > 0]
-df = koppel_weer(df, weer)
-st.write(
-    f"Het weerbestand begint in 1973 en heeft {getal(len(weer))} dagen. Wij hebben alleen de dagen van 2019 en 2020 nodig "
-    f"({len(weer_jaren)} dagen) en koppelen die op datum aan de vluchten."
-)
-st.write("Lege waarden in het weer van 2019 en 2020:")
-st.dataframe(leeg_weer.rename("aantal leeg"))
-
-# correlatie van weer en drukte met vertraging
-verband = df[["vertraging", "tavg", "prcp", "wdir", "wspd", "wpgt", "pres", "drukte"]].corr()["vertraging"]
-verband = verband.drop("vertraging").round(3).reset_index()
-verband.columns = ["kolom", "verband"]
-fig = px.bar(verband, x="kolom", y="verband", labels={"verband": "Verband met vertraging"})
-st.plotly_chart(fig)
-
-weer_verband = verband[verband["kolom"] != "drukte"]
+weer_verband = verband[verband["soort"] == "weer"]
 sterkste = weer_verband.loc[weer_verband["verband"].abs().idxmax()]
-drukte_verband = verband.loc[verband["kolom"] == "drukte", "verband"].iloc[0]
-
-st.header("Klaar")
-st.write(f"We hebben nu {getal(len(df))} vluchten en {df.shape[1]} kolommen. Hiermee gaan we verder bij de deelvragen.")
-st.write("Conclusie: de data is klaar. We kunnen nu de lijngrafiek en de kaart maken (Vertraging over de tijd en Bestemmingen) en een model bouwen (Voorspellen).")
-st.dataframe(df.head())
-
-df_vliegtuigen_per_uur = (
-    df.groupby("uur").size().reset_index(name="aantal_vliegtuigen")
+drukte_verband = verband.loc[verband["soort"] == "drukte", "verband"].iloc[0]
+st.write(
+    "De luchthaven (Org/Des) hebben we opgezocht in de Kaggle-data, zo kregen we land en plek. "
+    f"We vonden {r['n_gevonden']} van de {r['n_codes']} codes. Het weer per dag hebben we op datum aan elke vlucht gekoppeld. "
+    f"Het weer hangt zwak samen met vertraging (sterkste: {sterkste['naam']}, {sterkste['verband']}), drukte iets sterker ({drukte_verband}). "
+    "We nemen ze toch mee, het model kan combinaties van kolommen wel gebruiken."
 )
-
-fig = px.line(
-    df_vliegtuigen_per_uur,
-    x="uur",
-    y="aantal_vliegtuigen",
-    title="Aantal vliegtuigen op de airport per uur",
-    labels={
-        "uur": "Tijd van de dag (Uur)",
-        "aantal_vliegtuigen": "Aantal vliegtuigen",
-    },
-    markers=True,  # Voegt punten toe op de lijn voor betere leesbaarheid
-)
-
-# Optioneel: zorg dat de x-as nette uuraanduidingen heeft (0 t/m 23)
-fig.update_xaxes(dtick=1)
-
-st.plotly_chart(fig, use_container_width=True)
