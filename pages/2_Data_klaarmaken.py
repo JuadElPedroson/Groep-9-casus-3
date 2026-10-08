@@ -8,7 +8,6 @@ from schoon import (
     maak_kolommen, maak_vertraging, streepjes_naar_leeg,
 )
 
-
 def getal(n):
     return f"{n:,}".replace(",", ".")
 
@@ -198,14 +197,6 @@ st.write(
     "Dus het uur is een goede kolom om mee te nemen."
 )
 per_jaar = df.groupby("jaar")["vertraging"].mean().round(1)
-st.write(
-    f"Ook het jaar maakt uit: gemiddeld {per_jaar[2019]} minuten in 2019 en {per_jaar[2020]} minuten in 2020. "
-    "Dat zal met corona te maken hebben. Het jaar nemen we daarom ook mee."
-)
-st.write(
-    "Conclusie: uur en jaar laten duidelijk verschil zien, dus die nemen we zeker mee. "
-    "Weekdag, maand, maatschappij en drukte hebben we nog niet bekeken. Dat kan bij Vertraging over de tijd, bijvoorbeeld met een lijngrafiek."
-)
 
 # stap 5
 st.header("Stap 5: luchthavens koppelen")
@@ -223,10 +214,6 @@ st.write(
     "Zo hebben we per vlucht het land en de plek op de kaart."
 )
 st.dataframe(df[["Org/Des", "luchthaven", "land", "lat", "lon"]].dropna().drop_duplicates("Org/Des").head())
-st.write(
-    "Conclusie: per vlucht kunnen we nu het land gebruiken in het model, en met lat en lon later de kaart maken. "
-    "De vluchten zonder luchthaven vallen buiten de kaart."
-)
 
 # stap 6
 st.header("Stap 6: weer koppelen")
@@ -241,10 +228,6 @@ st.write(
 )
 st.write("Lege waarden in het weer van 2019 en 2020:")
 st.dataframe(leeg_weer.rename("aantal leeg"))
-st.write(
-    f"Snow en tsun zijn helemaal leeg, die laten we weg. Bij prcp (neerslag) missen {leeg_weer.get('prcp', 0)} dagen, "
-    "die laten we leeg. De rest nemen we mee."
-)
 
 # correlatie van weer en drukte met vertraging
 verband = df[["vertraging", "tavg", "prcp", "wdir", "wspd", "wpgt", "pres", "drukte"]].corr()["vertraging"]
@@ -252,24 +235,33 @@ verband = verband.drop("vertraging").round(3).reset_index()
 verband.columns = ["kolom", "verband"]
 fig = px.bar(verband, x="kolom", y="verband", labels={"verband": "Verband met vertraging"})
 st.plotly_chart(fig)
+
 weer_verband = verband[verband["kolom"] != "drukte"]
 sterkste = weer_verband.loc[weer_verband["verband"].abs().idxmax()]
 drukte_verband = verband.loc[verband["kolom"] == "drukte", "verband"].iloc[0]
-st.write(
-    f"Wat opvalt: de weerkolommen hebben allemaal een zwak verband met vertraging. Het sterkste is {sterkste['kolom']} "
-    f"met {sterkste['verband']}. Dat kan komen doordat we het weer maar per dag hebben, terwijl de vertraging per vlucht verschilt. "
-    "We nemen het weer toch mee en kijken later of het model er beter van wordt."
-)
-st.write(
-    f"Drukte heeft een sterker verband ({drukte_verband}), maar ook dat is niet groot. "
-    "Waarschijnlijk komt vertraging door meerdere dingen samen."
-)
-st.write(
-    "Conclusie: we verwachten niet dat het weer alleen de vertraging verklaart. We nemen het wel mee en testen later "
-    "of het model beter wordt met of zonder weer. Dat kunnen we dan laten zien in de presentatie."
-)
 
 st.header("Klaar")
 st.write(f"We hebben nu {getal(len(df))} vluchten en {df.shape[1]} kolommen. Hiermee gaan we verder bij de deelvragen.")
 st.write("Conclusie: de data is klaar. We kunnen nu de lijngrafiek en de kaart maken (Vertraging over de tijd en Bestemmingen) en een model bouwen (Voorspellen).")
 st.dataframe(df.head())
+
+df_vliegtuigen_per_uur = (
+    df.groupby("uur").size().reset_index(name="aantal_vliegtuigen")
+)
+
+fig = px.line(
+    df_vliegtuigen_per_uur,
+    x="uur",
+    y="aantal_vliegtuigen",
+    title="Aantal vliegtuigen op de airport per uur",
+    labels={
+        "uur": "Tijd van de dag (Uur)",
+        "aantal_vliegtuigen": "Aantal vliegtuigen",
+    },
+    markers=True,  # Voegt punten toe op de lijn voor betere leesbaarheid
+)
+
+# Optioneel: zorg dat de x-as nette uuraanduidingen heeft (0 t/m 23)
+fig.update_xaxes(dtick=1)
+
+st.plotly_chart(fig, use_container_width=True)
