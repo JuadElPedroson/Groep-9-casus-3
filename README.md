@@ -1,5 +1,7 @@
 # Groep 9 - Case 3: vluchten en vertraging
 
+Dashboard: https://groep-9-casus-3-zurich-vertraging.streamlit.app/
+
 Streamlit-dashboard voor Case 3 van de minor Data Science. We gebruiken het vluchtrooster van Zurich Airport, luchthavens van Kaggle en weerdata van Meteostat.
 
 ## Data

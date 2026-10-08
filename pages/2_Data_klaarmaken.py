@@ -103,13 +103,8 @@ st.write(
 
 st.subheader("Wat voorspellen we?")
 st.write(
-    "De vertraging in minuten: de echte tijd (ATA_ATD_ltc) min de geplande tijd (STA_STD_ltc). "
-    "Die kolom zit niet in de data, dus we maken hem zelf. Een negatief getal betekent te vroeg. "
-    "We voorspellen met kenmerken van de vlucht (landing of start, vliegtuigtype, maatschappij), "
-    "de tijd (uur, weekdag, maand, jaar, drukte), de plek (baan, land) en het weer."
-)
-st.caption(
-    "Niet gebruikt: ATA_ATD_ltc (dat is de uitkomst zelf), Identifier en DL1 tot IX2 (we weten niet wat ze betekenen)."
+    "De vertraging in minuten: de echte tijd min de geplande tijd. Die kolom zit niet in de data, dus we maken hem zelf. "
+    "We voorspellen met de vlucht, de tijd, de plek en het weer."
 )
 
 # vertraging uitrekenen
@@ -122,19 +117,17 @@ fig = px.bar(
 fig.update_layout(height=320, margin=dict(t=20, b=20))
 st.plotly_chart(fig)
 st.write(
-    f"De tijden in de data hebben geen datum, daardoor leken {r['n_middernacht']} vluchten rond middernacht "
-    "meer dan 3 uur te vroeg. Daar hebben we een dag bij opgeteld. "
-    f"Bij S is {r['laat_s']}% van de vluchten meer dan 15 minuten te laat, bij L is dat {r['laat_l']}%. "
-    "Dat verschil is groot, dus LSV gaat mee in het model."
+    f"De tijden hebben geen datum, dus {r['n_middernacht']} vluchten rond middernacht leken meer dan 3 uur te vroeg. "
+    "Daar tellen we een dag bij op. "
+    f"Bij S is {r['laat_s']}% van de vluchten meer dan 15 minuten te laat, bij L {r['laat_l']}%. Dat verschil is groot, dus LSV gaat mee."
 )
 
 # streepjes en lege waarden
 st.subheader("Lege waarden")
 dl = r["leeg"][r["leeg"]["kolom"].isin(["DL1", "IX1", "DL2", "IX2"])]["procent"]
 st.write(
-    "In veel kolommen staat een streepje voor onbekend. Die hebben we leeg gemaakt. "
-    "TAR, GAT, RWC en Org/Des zijn bijna volledig gevuld (minder dan 1% leeg), die houden we. "
-    f"DL1 tot IX2 zijn voor {dl.min()}% tot {dl.max()}% leeg en we weten niet wat ze betekenen, die laten we weg."
+    "Een streepje betekent onbekend, dat hebben we leeg gemaakt. TAR, GAT, RWC en Org/Des zijn bijna volledig gevuld en blijven. "
+    f"DL1 tot IX2 zijn {dl.min()}% tot {dl.max()}% leeg en we weten niet wat ze betekenen, die laten we weg."
 )
 
 # uitschieters
@@ -149,11 +142,10 @@ fig.update_yaxes(range=[-150, 300])
 fig.update_layout(height=340, margin=dict(t=20, b=20))
 st.plotly_chart(fig)
 st.write(
-    f"Bijna alle vluchten zitten dicht bij 0 (de grafiek is ingezoomd, {r['n_buiten']} vluchten liggen buiten beeld). "
-    f"Meer dan 60 minuten te vroeg komt bijna niet voor en lijkt een fout, dus die {r['n_weg']} vluchten "
-    f"({round(r['n_weg'] / r['totaal'] * 100, 3)}%) halen we weg. "
-    f"Te late vluchten laten we staan, ook de langste van {round(r['max_laat'], 1)} uur: dat is echte vertraging. "
-    f"De keuze verandert weinig, het gemiddelde is {r['gem_voor']} tegen {r['gem_na']} minuten."
+    f"De grafiek is ingezoomd, {r['n_buiten']} vluchten liggen buiten beeld. "
+    f"Meer dan 60 minuten te vroeg lijkt een fout, die {r['n_weg']} vluchten ({round(r['n_weg'] / r['totaal'] * 100, 3)}%) halen we weg. "
+    f"Te late vluchten blijven, ook de langste van {round(r['max_laat'], 1)} uur, want dat is echte vertraging. "
+    f"Het gemiddelde verandert nauwelijks ({r['gem_voor']} tegen {r['gem_na']} minuten)."
 )
 
 # nieuwe kolommen
@@ -164,10 +156,10 @@ genoeg = per_uur[per_uur["count"] >= 500]
 hoogste = genoeg.loc[genoeg["mean"].idxmax()]
 laagste = genoeg.loc[genoeg["mean"].idxmin()]
 st.write(
-    "Uit datum en tijd maken we uur, weekdag, maand en jaar. Uit het vluchtnummer maken we de maatschappij "
-    "en drukte is het aantal vluchten in hetzelfde uur op dezelfde dag. "
-    f"Het uur maakt uit: rond {int(hoogste['uur'])} uur is de vertraging het hoogst ({round(hoogste['mean'], 1)} minuten) "
-    f"en rond {int(laagste['uur'])} uur het laagst ({round(laagste['mean'], 1)} minuten)."
+    "Uit datum en tijd maken we uur, weekdag, maand en jaar, uit het vluchtnummer de maatschappij. "
+    "Drukte is het aantal vluchten in hetzelfde uur. "
+    f"Het uur maakt uit: rond {int(hoogste['uur'])} uur is de vertraging het hoogst ({round(hoogste['mean'], 1)} minuten), "
+    f"rond {int(laagste['uur'])} uur het laagst ({round(laagste['mean'], 1)} minuten)."
 )
 
 # luchthavens en weer koppelen
@@ -184,8 +176,7 @@ weer_verband = verband[verband["soort"] == "weer"]
 sterkste = weer_verband.loc[weer_verband["verband"].abs().idxmax()]
 drukte_verband = verband.loc[verband["soort"] == "drukte", "verband"].iloc[0]
 st.write(
-    "De luchthaven (Org/Des) hebben we opgezocht in de Kaggle-data, zo kregen we land en plek. "
-    f"We vonden {r['n_gevonden']} van de {r['n_codes']} codes. Het weer per dag hebben we op datum aan elke vlucht gekoppeld. "
+    f"We zochten de luchthaven op in de Kaggle-data ({r['n_gevonden']} van de {r['n_codes']} codes gevonden) en koppelden het weer per dag. "
     f"Het weer hangt zwak samen met vertraging (sterkste: {sterkste['naam']}, {sterkste['verband']}), drukte iets sterker ({drukte_verband}). "
-    "We nemen ze toch mee, het model kan combinaties van kolommen wel gebruiken."
+    "We nemen ze toch mee, het model kijkt ook naar combinaties."
 )
